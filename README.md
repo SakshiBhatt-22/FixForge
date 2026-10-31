@@ -1,59 +1,217 @@
-# FixForge — controlled AI-assisted JavaScript debugging
+# FixForge
 
-> **Brand:** FixForge — AI-assisted JavaScript debugging with controlled patch validation.
+### AI-Assisted JavaScript Debugging & Code Correction
 
-A full-stack React + Express MVP that demonstrates a reproducible bug-to-patch workflow: select a known JavaScript issue, compare original and corrected code, run a controlled test suite, and optionally request a Gemini explanation.
+FixForge is a full-stack JavaScript debugging assistant built with **React, Node.js, and Express**, integrating **Google Gemini** to generate suggested code corrections and explain bugs.
 
-## What works
-- Three reproducible JavaScript bug scenarios: cart quantity, active-user filtering, pagination.
-- Side-by-side original and corrected code.
-- Before/after automated test results (3 tests per scenario).
-- Optional Gemini-generated root-cause explanation, with a local fallback when no key is configured.
-- Clear errors, mobile-responsive dark UI, API endpoint for scenarios and analysis.
+It combines AI-assisted code fixing with reproducible debugging scenarios and controlled automated testing, helping developers review proposed changes and understand their impact.
 
-## Scope and limitations — read before putting this on your resume
-**This is a controlled demonstration, not a general-purpose GitHub issue resolution agent.** The patches are pre-reviewed and stored in `server/scenarios.js`. Gemini explains the fix; it does **not** generate or apply patches. The app does not clone GitHub repositories, open PRs, run arbitrary user code, or autonomously debug unseen issues. Do not claim any of those capabilities.
+## Preview
 
-The built-in tests execute only developer-authored fixture code via Node `vm`. Node `vm` is **not** a security boundary; never pass user-provided or LLM-generated code to it. For real arbitrary-code execution, use a hardened isolated container with resource/network restrictions.
+![FixForge Dashboard](screenshots/dashboard.png)
 
-## Setup (Windows PowerShell or terminal)
-Requires Node.js 20+.
+## Features
+
+### AI-Assisted Code Fixing
+
+- Submit custom JavaScript code along with a description of the bug.
+- Generate a suggested correction using the Gemini API.
+- Compare original and AI-generated code side by side.
+- View explanations describing the bug and proposed solution.
+- Review suggested fixes without automatically executing or applying them.
+
+![FixForge AI-Generated Code Fix](screenshots/ai-fix.png)
+
+### Controlled Debugging & Validation
+
+- Explore three predefined JavaScript debugging scenarios covering cart calculations, user filtering, and pagination.
+- Compare original implementations with pre-reviewed corrections.
+- Run three automated fixture tests per scenario.
+- Examine before-and-after test results and individual test outcomes.
+- View Gemini-generated root-cause explanations, with a local fallback when unavailable.
+
+![FixForge Controlled Patch Validation](screenshots/validation.png)
+
+### Additional Features
+
+- Responsive, dark-themed debugging workspace.
+- REST API with input validation and error handling.
+- Environment-based Gemini API configuration.
+- Request timeout handling for external AI calls.
+
+## Tech Stack
+
+| Component | Technologies |
+|---|---|
+| Frontend | React, Vite, JavaScript, CSS |
+| Backend | Node.js, Express |
+| AI Integration | Google Gemini API |
+| Testing | Node.js, controlled fixture tests |
+| Version Control | Git, GitHub |
+
+## Architecture
+
+FixForge provides two independent debugging workflows.
+
+**AI-Assisted Code Fixing**
+
+```text
+JavaScript code + bug description
+               |
+               v
+          React frontend
+               |
+               v
+          Express API
+               |
+               v
+           Gemini API
+               |
+               v
+   Suggested fix + explanation
+               |
+               v
+       Code comparison UI
+```
+
+**Controlled Scenario Validation**
+
+```text
+       Predefined bug scenario
+                 |
+                 v
+        Controlled test engine
+                 |
+                 v
+      Before/after test results
+                 |
+                 v
+      Gemini / local explanation
+                 |
+                 v
+            React frontend
+```
+
+Custom Gemini-generated fixes are suggestions and are not automatically validated. Automated tests run only against predefined, developer-authored fixtures.
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 20+
+- npm
+- Google Gemini API key for AI functionality
+
+### Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/YOUR_USERNAME/FixForge.git
+cd FixForge
+```
+
+Install dependencies:
 
 ```bash
 npm install
 npm run install:all
-cp server/.env.example server/.env
+```
+
+### Environment Configuration
+
+Create the backend environment file.
+
+**Windows PowerShell:**
+
+```powershell
+Copy-Item server/.env.example server/.env
+```
+
+**Windows Command Prompt:**
+
+```cmd
+copy server\.env.example server\.env
+```
+
+Configure `server/.env`:
+
+```env
+GEMINI_API_KEY=your_api_key_here
+GEMINI_MODEL=your_supported_gemini_model
+```
+
+### Run Locally
+
+```bash
 npm run dev
 ```
 
-On Windows PowerShell use `Copy-Item server/.env.example server/.env` instead of `cp` if preferred.
+- **Frontend:** http://localhost:5173
+- **Backend:** http://localhost:4000
 
-Visit http://localhost:5173. The backend is at http://localhost:4000.
+## API Reference
 
-To enable AI explanations, put a Gemini API key in `server/.env` as `GEMINI_API_KEY=...`. Set `GEMINI_MODEL` to a model available for your key. Never commit `.env`.
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/health` | Check backend availability |
+| `GET` | `/api/scenarios` | Retrieve predefined debugging scenarios |
+| `POST` | `/api/analyze` | Analyze and validate a predefined scenario |
+| `POST` | `/api/fix` | Generate an AI-suggested correction for custom JavaScript |
 
-## Tests and build
+### Example: AI Code Fixing
+
+**Request:** `POST /api/fix`
+
+```json
+{
+  "code": "function add(a, b) { return a - b; }",
+  "issue": "The function should add two numbers, not subtract them."
+}
+```
+
+**Example successful response:**
+
+```json
+{
+  "mode": "gemini",
+  "originalCode": "function add(a, b) { return a - b; }",
+  "fixedCode": "function add(a, b) { return a + b; }",
+  "explanation": "The function uses subtraction instead of addition. Replacing the subtraction operator with addition corrects the behavior.",
+  "verified": false
+}
+```
+
+AI-generated responses may vary.
+
+## Testing
+
+Run the project tests:
+
 ```bash
 npm test
+```
+
+Build the frontend:
+
+```bash
 npm --prefix client run build
 ```
 
-## API
-- `GET /api/health`
-- `GET /api/scenarios`
-- `POST /api/analyze` body: `{"scenarioId":"sum-cart"}`
+Each predefined debugging scenario contains three automated fixture tests. These tests evaluate known implementations and their pre-reviewed corrections.
 
-## Architecture
-`React UI → Express API → controlled fixture engine → test results` and optionally `Express API → Gemini explanation → fallback`.
+**Note:** Test results from predefined scenarios do not represent the accuracy of Gemini-generated fixes for arbitrary user code.
 
-## Evaluation
-The built-in test suite is **not** a benchmark of autonomous AI performance. Each of the 3 scenarios has 3 fixture tests. Run `npm test` and interact with each scenario to verify the before/after pass counts. Do not claim AI fix success rates from these deterministic fixtures.
+## Limitations & Security
 
-## Next engineering milestones
-1. Allow user-supplied issue descriptions and repository context (without execution).
-2. Generate structured patch proposals with Gemini and show diffs.
-3. Add user approval and a genuinely isolated test runner for untrusted code.
-4. Add GitHub integration and evaluation on previously unseen issues.
+FixForge is an AI-assisted debugging tool, not an autonomous repository-repair agent.
 
-## Resume description (truthful MVP scope)
-“Built a React and Express debugging dashboard featuring three reproducible JavaScript bug scenarios, side-by-side patch review, automated before/after tests, and optional Gemini-generated root-cause explanations.”
+- AI-generated fixes are not automatically executed, tested, or applied.
+- Automated validation is limited to developer-authored debugging scenarios.
+- The application does not clone repositories, create pull requests, or autonomously resolve GitHub issues.
+- The controlled fixture engine uses Node.js `vm`, which is not a security boundary and must not be used to execute untrusted code.
+- AI functionality depends on Gemini API availability and rate limits.
+
+---
+
+**FixForge — Debug with clarity.**
