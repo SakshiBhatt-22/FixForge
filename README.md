@@ -38,6 +38,9 @@ It combines AI-assisted code fixing with reproducible debugging scenarios and co
 - REST API with input validation and error handling.
 - Environment-based Gemini API configuration.
 - Request timeout handling for external AI calls.
+- Automatic retries for temporary Gemini API server failures using exponential backoff.
+- Quota-aware error handling that avoids unnecessary retries when Gemini returns HTTP 429.
+- Clear error messages when AI-generated fixes are temporarily unavailable.
 
 ## Tech Stack
 
@@ -59,7 +62,7 @@ FixForge provides two independent debugging workflows.
 JavaScript code + bug description
                |
                v
-          React frontend
+         React frontend
                |
                v
           Express API
@@ -184,6 +187,17 @@ npm run dev
 
 AI-generated responses may vary.
 
+### API Error Handling
+
+FixForge handles failures from the Gemini API to improve reliability and provide clearer feedback.
+
+- **HTTP 429 — Rate limit or quota reached:** Stops further retries and returns a descriptive error.
+- **HTTP 500, 502, 503, 504 — Temporary server errors:** Retries requests using exponential backoff, up to three attempts.
+- **Request timeout:** Limits how long individual Gemini API requests can run.
+- **Invalid AI response:** Rejects empty, malformed, or incomplete AI-generated responses.
+
+When the API quota is exhausted, the application cannot generate new AI fixes until API access becomes available again.
+
 ## Testing
 
 Run the project tests:
@@ -202,6 +216,8 @@ Each predefined debugging scenario contains three automated fixture tests. These
 
 **Note:** Test results from predefined scenarios do not represent the accuracy of Gemini-generated fixes for arbitrary user code.
 
+The Gemini HTTP 429 handling has also been checked using a locally mocked API response without consuming API quota. This does not constitute comprehensive automated testing of all external API failure cases.
+
 ## Limitations & Security
 
 FixForge is an AI-assisted debugging tool, not an autonomous repository-repair agent.
@@ -210,7 +226,8 @@ FixForge is an AI-assisted debugging tool, not an autonomous repository-repair a
 - Automated validation is limited to developer-authored debugging scenarios.
 - The application does not clone repositories, create pull requests, or autonomously resolve GitHub issues.
 - The controlled fixture engine uses Node.js `vm`, which is not a security boundary and must not be used to execute untrusted code.
-- AI functionality depends on Gemini API availability and rate limits.
+- AI functionality depends on Gemini API availability, rate limits, and usage quotas.
+- Retry handling improves resilience to temporary failures but cannot bypass API quota restrictions.
 
 ---
 
