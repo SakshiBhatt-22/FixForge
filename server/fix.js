@@ -1,4 +1,10 @@
 
+const RETRYABLE_STATUS_CODES = new Set([500, 502, 503, 504]);
+const MAX_ATTEMPTS = 3;
+const REQUEST_TIMEOUT_MS = 30000;
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 export async function generateFix(code, issue) {
   const key = process.env.GEMINI_API_KEY;
 
@@ -29,32 +35,80 @@ ORIGINAL JAVASCRIPT CODE:
 ${code}
 `;
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": key
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: prompt }]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 4096,
-          responseMimeType: "application/json"
-        }
-      }),
-      signal: AbortSignal.timeout(30000)
-    }
-  );
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
-  if (!response.ok) {
-    throw new Error(`Gemini API returned ${response.status}`);
+  const requestBody = JSON.stringify({
+    contents: [
+      {
+        parts: [{ text: prompt }]
+      }
+    ],
+    generationConfig: {
+      temperature: 0.2,
+      maxOutputTokens: 4096,
+      responseMimeType: "application/json"
+    }
+  });
+
+  let response;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": key
+        },
+        body: requestBody,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+      });
+
+      if (response.ok) {
+  break;
+}
+
+if (response.status === 429) {
+  throw new Error(
+    "Gemini's API rate limit or quota has been reached. Please try again later."
+  );
+}
+
+const retryable = RETRYABLE_STATUS_CODES.has(response.status);
+
+      if (!retryable || attempt === MAX_ATTEMPTS) {
+        throw new Error(`Gemini API returned ${response.status}`);
+      }
+
+      const delay = 1000 * 2 ** (attempt - 1);
+
+      console.warn(
+        `Gemini returned ${response.status}. Retrying in ${delay}ms ` +
+        `(attempt ${attempt + 1}/${MAX_ATTEMPTS})`
+      );
+
+      await sleep(delay);
+    } catch (error) {
+      // Retry timeouts and network failures, but not HTTP errors
+      // already handled above.
+      const isHttpError =
+         error.message.startsWith("Gemini API returned") ||
+         error.message.includes("rate limit or quota has been reached");
+
+      if (isHttpError || attempt === MAX_ATTEMPTS) {
+        throw error;
+      }
+
+      const delay = 1000 * 2 ** (attempt - 1);
+
+      console.warn(
+        `Gemini request failed: ${error.message}. ` +
+        `Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_ATTEMPTS})`
+      );
+
+      await sleep(delay);
+    }
   }
 
   const data = await response.json();
